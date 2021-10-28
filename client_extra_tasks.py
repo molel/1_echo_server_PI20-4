@@ -1,5 +1,6 @@
 import socket
 import sys
+import re
 from datetime import datetime
 
 LOG = "client_log.txt"
@@ -94,11 +95,21 @@ def send_and_get(sock: socket.socket):
 def get_host_and_name():
     host = input("Введите хост или нажмите Enter для настройки по умолчанию: ")
     port = input("Введите порт или нажмите Enter для настройки по умолчанию: ")
-
-    if host == "":
-        host = "127.0.0.1"
-    if port == "":
+    try:
+        port = int(port)
+        if 0 <= port <= 2 ** 16 - 1:
+            port = 9090
+    except:
         port = 9090
+
+    try:
+        for octet in host.split("."):
+            if 0 <= int(octet) <= 255:
+                pass
+        if len(host.split(".")) != 4:
+            host = "127.0.0.1"
+    except:
+        host = "127.0.0.1"
 
     return host, port
 
