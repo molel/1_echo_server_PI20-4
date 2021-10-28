@@ -1,13 +1,14 @@
 import socket
 from datetime import datetime
+from Users import Users
 
 LOG = "server_log.txt"
-AUTH = "auth.txt"
+AUTH = "auth.json"
 LOGIN = "Введите логин"
 PASSWORD = "Введите пароль"
 NEW_PASSWORD = "Задайте пароль"
 SUCCESS = "Вход выполнен"
-EXIT = "exit"
+EXIT = "exit\n"
 
 
 # функция добавления новой записи в файл логов
@@ -16,23 +17,7 @@ def write_log(filename: str, log: str):
         file.write(f"{datetime.now()}:\n{log}\n\n")
 
 
-# функция добавления новой пары логин:пароль в файл аутентификации
-def add_login(filename: str, login: str, password: str):
-    with open(filename, "a") as file:
-        file.write(login + ":" + password + "\n")
-
-
-def read_logins(filename: str) -> dict:
-    logins = dict()
-    with open(filename, "r") as file:
-        for row in file:
-            login = row.split(":")[0]
-            password = row.split(":")[1][:-1]
-            logins[login] = password
-        return logins
-
-
-logins: dict = read_logins(AUTH)
+users = Users(AUTH)
 
 
 def bind(sock: socket.socket, port: int = 9090):
@@ -43,12 +28,15 @@ def bind(sock: socket.socket, port: int = 9090):
         bind(sock, port + 1)
 
 
-def auth(sock: socket.socket, conn: socket.socket, addr: tuple):
-    global logins
+def auth(sock: socket.socket, conn: socket.socket, addr: str):
+    global users
     login = get_login(conn)
     write_log(LOG, f"Получено '{login}'")
-    if login in logins.keys():
-        get_password(sock, conn, addr, logins[login])
+    if users.is_exist(addr):
+        if users.get_field_value(addr, "is_logged_in"):
+            echo(sock, conn, addr)
+        else:
+            get_password(sock, conn, addr, users.get_field_value(addr[0], "password"))
     else:
         get_new_password(sock, conn, addr, login)
 
@@ -59,7 +47,7 @@ def get_login(conn: socket.socket) -> str:
     return conn.recv(2048).decode()
 
 
-def get_password(sock: socket.socket, conn: socket.socket, addr: tuple, correct_password: str):
+def get_password(sock: socket.socket, conn: socket.socket, addr: str, correct_password: str):
     conn.send(PASSWORD.encode())
     write_log(LOG, f"Отправлено '{PASSWORD}'")
     password = conn.recv(2048).decode()
@@ -70,18 +58,17 @@ def get_password(sock: socket.socket, conn: socket.socket, addr: tuple, correct_
         get_password(sock, conn, addr, correct_password)
 
 
-def get_new_password(sock: socket.socket, conn: socket.socket, addr: tuple, login: str):
-    global logins
+def get_new_password(sock: socket.socket, conn: socket.socket, addr: str, login: str):
+    global users
     conn.send(NEW_PASSWORD.encode())
     write_log(LOG, f"Отправлено '{NEW_PASSWORD}'")
     new_password = conn.recv(2048).decode()
     write_log(LOG, f"Получено '{new_password}'")
-    add_login(AUTH, login, new_password)
-    logins[login] = new_password
+    users.add_ip(addr, login, new_password)
     echo(sock, conn, addr)
 
 
-def echo(sock: socket.socket, conn: socket.socket, addr: tuple):
+def echo(sock: socket.socket, conn: socket.socket, addr: str):
     conn.send(SUCCESS.encode())
     write_log(LOG, f"Отправлено '{SUCCESS}'")
     while True:
@@ -89,6 +76,7 @@ def echo(sock: socket.socket, conn: socket.socket, addr: tuple):
             message = conn.recv(2048)
             write_log(LOG, f"Получено '{message.decode()}'")
             if message.decode() == EXIT:
+                users.set_field_value(addr, "is_logged_in", False)
                 accept(sock)
             else:
                 conn.send(message)
@@ -103,7 +91,7 @@ def accept(sock: socket.socket):
         try:
             conn, addr = sock.accept()
             write_log(LOG, f"Соединено с {addr[0]}, {addr[1]}")
-            auth(sock, conn, addr)
+            auth(sock, conn, addr[0])
             break
         except:
             continue

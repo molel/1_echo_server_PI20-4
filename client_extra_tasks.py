@@ -36,6 +36,8 @@ def send_login(sock: socket.socket):
         send_password(sock)
     elif message == NEW_PASSWORD:
         send_new_password(sock)
+    elif message == SUCCESS:
+        send_and_get(sock)
 
 
 # отправка пароля
