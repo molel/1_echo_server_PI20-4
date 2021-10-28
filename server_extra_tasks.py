@@ -36,7 +36,7 @@ def auth(sock: socket.socket, conn: socket.socket, addr: str):
         if users.get_field_value(addr, "is_logged_in"):
             echo(sock, conn, addr)
         else:
-            get_password(sock, conn, addr, users.get_field_value(addr[0], "password"))
+            get_password(sock, conn, addr, users.get_field_value(addr, "password"))
     else:
         get_new_password(sock, conn, addr, login)
 
@@ -69,6 +69,7 @@ def get_new_password(sock: socket.socket, conn: socket.socket, addr: str, login:
 
 
 def echo(sock: socket.socket, conn: socket.socket, addr: str):
+    users.set_field_value(addr, "is_logged_in", True)
     conn.send(SUCCESS.encode())
     write_log(LOG, f"Отправлено '{SUCCESS}'")
     while True:
